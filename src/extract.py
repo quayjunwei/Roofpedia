@@ -5,12 +5,16 @@ from tqdm import tqdm
 from PIL import Image
 import geopandas as gp
 import numpy as np
+from shapely.geometry import shape, mapping
 
 from src.tiles import tiles_from_slippy_map
 from src.features.building import Roof_features
 
-def mask_to_feature(mask_dir):
+# flatten 3D geometries (if any) to 2D
+def flatten_geometry(g):
+    return shape(mapping(g))  # removes Z if present
 
+def mask_to_feature(mask_dir):
     handler = Roof_features()
     tiles = list(tiles_from_slippy_map(mask_dir))
 
@@ -18,63 +22,65 @@ def mask_to_feature(mask_dir):
         image = np.array(Image.open(path).convert("P"), dtype=np.uint8)
         mask = (image == 1).astype(np.uint8)
         handler.apply(tile, mask)
-    
-    # output feature collection
+
     feature = handler.jsonify()
-    
     return feature
 
 def intersection(target_type, city_name, mask_dir):
-    # predicted features
-    print()
-    print("Converting Prediction Masks to GeoJson Features")
+    print("\n Converting Prediction Masks to GeoJSON Features")
     features = mask_to_feature(mask_dir)
-    prediction = gp.GeoDataFrame.from_features(features, crs=4326) 
+    prediction = gp.GeoDataFrame.from_features(features, crs="EPSG:4326")
 
-    # loading building polygons
-    city = 'results/01City/' + city_name + '.geojson'
-    city = gp.GeoDataFrame.from_file(city)[['geometry']]  
-    city['area'] = city['geometry'].to_crs({'init': 'epsg:3395'}).map(lambda p: p.area)
-    
-    intersections= gp.sjoin(city, prediction, how="inner", op='intersects')
+    # load building polygons
+    city_path = os.path.join('results', '01City', city_name + '.geojson')
+    city = gp.read_file(city_path)[['geometry']]
+
+    # clean geometry + update CRS
+    city['geometry'] = city['geometry'].apply(flatten_geometry)
+    city = city[city.is_valid]
+    city['geometry'] = city['geometry'].to_crs('EPSG:4326')
+    city['area'] = city['geometry'].area
+
+    # spatial join between prediction & buildings
+    intersections = gp.sjoin(city, prediction, how="inner", predicate='intersects')
     intersections = intersections.drop_duplicates(subset=['geometry'])
-    intersections.to_file('results/04Results/' + city_name + '_' + target_type + ".geojson", driver='GeoJSON')
-    
-    print()
-    print("Process complete, footprints with " + target_type + " roofs are saved at results/04Results/" + city_name + '_' + target_type + ".geojson")
-    return intersections
 
+    # save results
+    output_path = os.path.join('results', '04Results', f"{city_name}_{target_type}.geojson")
+    intersections.to_file(output_path, driver='GeoJSON')
+
+    print(f"\n Process complete. Footprints with {target_type} roofs saved at:\n{output_path}")
+    return intersections
 
 def intersection_from_file(prediction_path, target_type, city_name, mask_dir):
-    # predicted features
-    print()
-    print("Converting Prediction Masks to GeoJson Features")
-    prediction = gp.GeoDataFrame.from_file(prediction_path)[['geometry']]  
+    print("\n Loading Prediction GeoJSON Features")
+    prediction = gp.read_file(prediction_path)[['geometry']]
 
-    # loading building polygons
-    city = 'results/01City/' + city_name + '.geojson'
-    city = gp.GeoDataFrame.from_file(city)[['geometry']]  
-    city['area'] = city['geometry'].to_crs({'init': 'epsg:3395'}).map(lambda p: p.area)
-    
-    intersections= gp.sjoin(city, prediction, how="inner", op='intersects')
+    city_path = os.path.join('results', '01City', city_name + '.geojson')
+    city = gp.read_file(city_path)[['geometry']]
+
+    city['geometry'] = city['geometry'].apply(flatten_geometry)
+    city = city[city.is_valid]
+    city['geometry'] = city['geometry'].to_crs('EPSG:4326')
+    city['area'] = city['geometry'].area
+
+    intersections = gp.sjoin(city, prediction, how="inner", predicate='intersects')
     intersections = intersections.drop_duplicates(subset=['geometry'])
-    intersections.to_file('results/04Results/' + city_name + '_' + target_type + ".geojson", driver='GeoJSON')
-    
-    print()
-    print("Process complete, footprints with " + target_type + " roofs are saved at results/04Results/" + city_name + '_' + target_type + ".geojson")
+
+    output_path = os.path.join('results', '04Results', f"{city_name}_{target_type}.geojson")
+    intersections.to_file(output_path, driver='GeoJSON')
+
+    print(f"\n Process complete. Footprints with {target_type} roofs saved at:\n{output_path}")
     return intersections
 
-
-if __name__=="__main__":
-
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("city", help="City to be predicted, must be the same as the name of the dataset")
-    parser.add_argument("type", help="Roof Typology, Green for Greenroof, Solar for PV Roof")
+    parser.add_argument("city", help="City to be predicted, must match dataset name")
+    parser.add_argument("type", help="Roof typology: 'Green' or 'Solar'")
     args = parser.parse_args()
 
     city_name = args.city
     target_type = args.type
     mask_dir = os.path.join("results", "03Masks", target_type, city_name)
-    
+
     intersection(target_type, city_name, mask_dir)
-    
