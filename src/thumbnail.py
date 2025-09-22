@@ -12,7 +12,7 @@ from qgis.core import (
 )
 
 # === CONFIGURATION ===
-layer_name = "test17"
+layer_name = "kanto_10000_centroid"
 zoom = 18
 tile_size = 256
 crop_size = 512  # final image size (pixels)
@@ -20,10 +20,10 @@ grid_size = 7    # larger grid to ensure enough margin
 stitched_size = tile_size * grid_size
 tile_url_template = "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
 
-output_base = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/test17/img"
-excel_path = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/test17/test17.xlsx"
-output_excel = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/test17/test17_tn.xlsx"
-thumbnail_column_letter = "H"
+output_base = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/img"
+excel_path = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/kanto_roof_larger_than_10000_meters2.xlsx"
+output_excel = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/kanto_roof_larger_than_10000_meters2_tn.xlsx"
+thumbnail_column_letter = "I"
 id_column_index = 1
 
 os.makedirs(output_base, exist_ok=True)
@@ -118,7 +118,7 @@ for row_idx in range(2, ws.max_row + 1):
     draw.line((center_x, center_y - cross_size, center_x, center_y + cross_size), fill="red", width=3)
 
     # Save image
-    output_path = os.path.join(output_base, f"{osm_id}.png")
+    output_path = os.path.join(output_base, f"{osm_id}.jpeg")
     cropped_img.save(output_path)
     print(f"✅ Saved centered image for {osm_id}")
 
