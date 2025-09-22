@@ -107,7 +107,6 @@ for row_idx in range(2, ws.max_row + 1):
     upper = pixel_y - crop_size // 2
     right = pixel_x + crop_size // 2
     lower = pixel_y + crop_size // 2
-
     cropped_img = stitched_img.crop((left, upper, right, lower))
 
     # Draw red cross at center
@@ -126,14 +125,21 @@ for row_idx in range(2, ws.max_row + 1):
     # Insert into Excel
     try:
         excel_img = ExcelImage(output_path)
-        excel_img.width = 200
-        excel_img.height = 200
+        excel_img.width = crop_size
+        excel_img.height = crop_size
         ws.add_image(excel_img, f"{thumbnail_column_letter}{row_idx}")
         print(f"✅ Inserted thumbnail for {osm_id}")
+
+        # Resize row and column to fit image
+        row_height = crop_size / 1.33
+        column_width = crop_size / 7
+        ws.row_dimensions[row_idx].height = row_height
+        ws.column_dimensions[thumbnail_column_letter].width = column_width
+
     except Exception as e:
         print(f"❌ Failed to insert image into Excel for {osm_id}: {e}")
         ws.cell(row=row_idx, column=8).value = "Image not found"
 
 # === SAVE EXCEL ===
 wb.save(output_excel)
-print("🎯 All images are same size, building is centered, red cross is accurate, and no borders remain.")
+print("🎯 All images inserted, cells resized, and Excel saved.")
