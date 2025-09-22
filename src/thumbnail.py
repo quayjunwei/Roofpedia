@@ -13,33 +13,28 @@ from qgis.core import (
 
 # === CONFIGURATION ===
 layer_name = "test17"
-zoom = 17
+zoom = 18
 tile_size = 256
-grid_size = 3
+crop_size = 512  # final image size (pixels)
+grid_size = 7    # larger grid to ensure enough margin
 stitched_size = tile_size * grid_size
-tile_url_template = "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"  # Hybrid layer
+tile_url_template = "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
 
 output_base = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/test17/img"
 excel_path = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/test17/test17.xlsx"
 output_excel = "C:/Users/junwei.quay/Documents/qgis_japan/kanto_buildings/kanto_10000/test17/test17_tn.xlsx"
 thumbnail_column_letter = "H"
-id_column_index = 1  # Column index for osm_id
+id_column_index = 1
 
 os.makedirs(output_base, exist_ok=True)
 
 # === HELPER FUNCTIONS ===
-def latlon_to_tile(lat, lon, zoom):
+def latlon_to_tile_coords(lat, lon, zoom):
     lat_rad = math.radians(lat)
     n = 2.0 ** zoom
-    x_tile = (lon + 180.0) / 360.0 * n
-    y_tile = (1.0 - math.log(math.tan(lat_rad) + 1.0 / math.cos(lat_rad)) / math.pi) / 2.0 * n
-    return x_tile, y_tile
-
-def latlon_to_pixel_offset(lat, lon, zoom, center_tile_x, center_tile_y):
-    x_tile_float, y_tile_float = latlon_to_tile(lat, lon, zoom)
-    dx = (x_tile_float - (center_tile_x - 1)) * tile_size
-    dy = (y_tile_float - (center_tile_y - 1)) * tile_size
-    return int(dx), int(dy)
+    x = (lon + 180.0) / 360.0 * n
+    y = (1.0 - math.log(math.tan(lat_rad) + 1.0 / math.cos(lat_rad)) / math.pi) / 2.0 * n
+    return x, y
 
 # === LOAD QGIS LAYER ===
 layer = QgsProject.instance().mapLayersByName(layer_name)[0]
@@ -71,20 +66,27 @@ for row_idx in range(2, ws.max_row + 1):
     wgs_point = xform.transform(geom)
     lat, lon = wgs_point.y(), wgs_point.x()
 
-    center_tile_x, center_tile_y = map(int, latlon_to_tile(lat, lon, zoom))
-    stitched_img = Image.new("RGB", (stitched_size, stitched_size))
+    # Get exact tile coordinates
+    x_tile_float, y_tile_float = latlon_to_tile_coords(lat, lon, zoom)
 
+    # Calculate top-left tile of stitched grid
+    half_grid = grid_size // 2
+    top_left_x = int(x_tile_float) - half_grid
+    top_left_y = int(y_tile_float) - half_grid
+
+    stitched_img = Image.new("RGB", (stitched_size, stitched_size))
     success = True
-    for dx in range(-1, 2):
-        for dy in range(-1, 2):
-            tile_x = center_tile_x + dx
-            tile_y = center_tile_y + dy
+
+    for dx in range(grid_size):
+        for dy in range(grid_size):
+            tile_x = top_left_x + dx
+            tile_y = top_left_y + dy
             tile_url = tile_url_template.format(x=tile_x, y=tile_y, z=zoom)
             try:
                 response = requests.get(tile_url, headers=headers)
                 if response.status_code == 200:
                     tile_img = Image.open(BytesIO(response.content)).convert("RGB")
-                    stitched_img.paste(tile_img, ((dx + 1) * tile_size, (dy + 1) * tile_size))
+                    stitched_img.paste(tile_img, (dx * tile_size, dy * tile_size))
                 else:
                     print(f"❌ Failed to download tile {tile_x}, {tile_y}")
                     success = False
@@ -97,18 +99,29 @@ for row_idx in range(2, ws.max_row + 1):
         continue
 
     # Calculate pixel offset of centroid within stitched image
-    pixel_x, pixel_y = latlon_to_pixel_offset(lat, lon, zoom, center_tile_x, center_tile_y)
+    pixel_x = int((x_tile_float - top_left_x) * tile_size)
+    pixel_y = int((y_tile_float - top_left_y) * tile_size)
 
-    # Draw red cross at centroid pixel
-    draw = ImageDraw.Draw(stitched_img)
-    cross_size = 8
-    draw.line((pixel_x - cross_size, pixel_y, pixel_x + cross_size, pixel_y), fill="red", width=3)
-    draw.line((pixel_x, pixel_y - cross_size, pixel_x, pixel_y + cross_size), fill="red", width=3)
+    # Crop fixed-size image centered on centroid
+    left = pixel_x - crop_size // 2
+    upper = pixel_y - crop_size // 2
+    right = pixel_x + crop_size // 2
+    lower = pixel_y + crop_size // 2
+
+    cropped_img = stitched_img.crop((left, upper, right, lower))
+
+    # Draw red cross at center
+    draw = ImageDraw.Draw(cropped_img)
+    cross_size = int(zoom * 1.5)
+    center_x = crop_size // 2
+    center_y = crop_size // 2
+    draw.line((center_x - cross_size, center_y, center_x + cross_size, center_y), fill="red", width=3)
+    draw.line((center_x, center_y - cross_size, center_x, center_y + cross_size), fill="red", width=3)
 
     # Save image
     output_path = os.path.join(output_base, f"{osm_id}.png")
-    stitched_img.save(output_path)
-    print(f"✅ Saved and annotated image for {osm_id}")
+    cropped_img.save(output_path)
+    print(f"✅ Saved centered image for {osm_id}")
 
     # Insert into Excel
     try:
@@ -123,4 +136,4 @@ for row_idx in range(2, ws.max_row + 1):
 
 # === SAVE EXCEL ===
 wb.save(output_excel)
-print("🎉 All tiles stitched, annotated, and inserted into Excel.")
+print("🎯 All images are same size, building is centered, red cross is accurate, and no borders remain.")
