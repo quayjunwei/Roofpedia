@@ -15,3 +15,5 @@ Pipeline.ipynb
 *.ipynb
 New Cities.qgz
 *.geojson
+*.qmd
+*.xml

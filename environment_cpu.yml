@@ -1,6 +1,12 @@
-name: roofpedia-cpu
+name: roofpedia-cpu-new
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+
 dependencies:
   - python=3.8
+  - pip
   - geopandas
   - matplotlib
   - pillow
@@ -9,7 +15,8 @@ dependencies:
   - tqdm
   - pytorch
   - torchvision
+  - pyproj=3.4.1
   - pip:
-    - webp
-    - mercantile==1.0.4
-    - opencv-python
+      - mercantile==1.0.4
+      - opencv-python
+      - geojson
