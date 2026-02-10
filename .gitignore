@@ -17,3 +17,11 @@ New Cities.qgz
 *.geojson
 *.qmd
 *.xml
+*.gpkg
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+*.xlsx
+*.csv
