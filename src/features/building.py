@@ -15,6 +15,8 @@ class Roof_features:
 
     def __init__(self):
         self.features = []
+        self.invalid_geometries = []  # Track invalid geometries with tile info
+        self.simplified_invalid = []  # Track polygons that became invalid after simplification
 
     def apply(self, tile, mask):
         
@@ -60,7 +62,12 @@ class Roof_features:
 
         for i, (polygon, node) in enumerate(zip(polygons, hierarchy)):
             if len(polygon) < 1:
-                print("Warning: simplified feature no longer valid polygon, skipping", file=sys.stderr)
+                # Track which tile had simplified invalid polygon
+                self.simplified_invalid.append({
+                    'tile': f"{tile.z}/{tile.x}/{tile.y}",
+                    'reason': 'simplified feature no longer valid polygon'
+                })
+                print(f"Warning: simplified feature no longer valid polygon in tile {tile.z}/{tile.x}/{tile.y}, skipping", file=sys.stderr)
                 continue
 
             _, _, _, parent_idx = node
@@ -95,7 +102,12 @@ class Roof_features:
             if shape.is_valid:
                 self.features.append(geojson.Feature(geometry=geometry))
             else:
-                print("Warning: extracted feature is not valid, skipping", file=sys.stderr)
+                # Track which tile had invalid geometry
+                self.invalid_geometries.append({
+                    'tile': f"{tile.z}/{tile.x}/{tile.y}",
+                    'reason': 'extracted feature is not valid'
+                })
+                print(f"Warning: extracted feature is not valid in tile {tile.z}/{tile.x}/{tile.y}, skipping", file=sys.stderr)
 
     def save(self, out):
         collection = geojson.FeatureCollection(self.features)
@@ -106,5 +118,13 @@ class Roof_features:
     def jsonify(self):
         collection = geojson.FeatureCollection(self.features)
 
-        return collection 
-        
+        return collection
+    
+    def get_invalid_tiles_summary(self):
+        """Return summary of problematic tiles"""
+        return {
+            'total_invalid': len(self.invalid_geometries),
+            'total_simplified_invalid': len(self.simplified_invalid),
+            'invalid_tiles': self.invalid_geometries,
+            'simplified_invalid_tiles': self.simplified_invalid
+        }
