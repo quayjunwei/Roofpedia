@@ -1,4 +1,4 @@
-name: roofpedia-cpu-new
+name: roofpedia-cpu
 channels:
   - conda-forge
   - pytorch
@@ -16,6 +16,9 @@ dependencies:
   - pytorch
   - torchvision
   - pyproj=3.4.1
+  - pyogrio
+  - gdal
+  - fiona
   - pip:
       - mercantile==1.0.4
       - opencv-python
