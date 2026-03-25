@@ -5,7 +5,14 @@ import geojson
 
 import shapely.geometry
 
-from src.features.core import denoise, grow, contours, simplify, featurize, parents_in_hierarchy
+from src.features.core import (
+    denoise,
+    grow,
+    contours,
+    simplify,
+    featurize,
+    parents_in_hierarchy,
+)
 
 
 class Roof_features:
@@ -16,10 +23,12 @@ class Roof_features:
     def __init__(self):
         self.features = []
         self.invalid_geometries = []  # Track invalid geometries with tile info
-        self.simplified_invalid = []  # Track polygons that became invalid after simplification
+        self.simplified_invalid = (
+            []
+        )  # Track polygons that became invalid after simplification
 
     def apply(self, tile, mask):
-        
+
         # The post-processing pipeline removes noise and fills in smaller holes. We then
         # extract contours, simplify them and transform tile pixels into coordinates.
 
@@ -48,12 +57,16 @@ class Roof_features:
 
         # This seems to be a bug in the OpenCV Python bindings; the C++ interface
         # returns a vector<vec4> but here it's always wrapped in an extra list.
-        assert len(hierarchy) == 1, "always single hierarchy for all polygons in multipolygon"
+        assert (
+            len(hierarchy) == 1
+        ), "always single hierarchy for all polygons in multipolygon"
         hierarchy = hierarchy[0]
 
         assert len(multipolygons) == len(hierarchy), "polygons and hierarchy in sync"
 
-        polygons = [simplify(polygon, self.simplify_threshold) for polygon in multipolygons]
+        polygons = [
+            simplify(polygon, self.simplify_threshold) for polygon in multipolygons
+        ]
 
         # Todo: generalize and move to features.core
 
@@ -63,11 +76,16 @@ class Roof_features:
         for i, (polygon, node) in enumerate(zip(polygons, hierarchy)):
             if len(polygon) < 1:
                 # Track which tile had simplified invalid polygon
-                self.simplified_invalid.append({
-                    'tile': f"{tile.z}/{tile.x}/{tile.y}",
-                    'reason': 'simplified feature no longer valid polygon'
-                })
-                print(f"Warning: simplified feature no longer valid polygon in tile {tile.z}/{tile.x}/{tile.y}, skipping", file=sys.stderr)
+                self.simplified_invalid.append(
+                    {
+                        "tile": f"{tile.z}/{tile.x}/{tile.y}",
+                        "reason": "simplified feature no longer valid polygon",
+                    }
+                )
+                print(
+                    f"Warning: simplified feature no longer valid polygon in tile {tile.z}/{tile.x}/{tile.y}, skipping",
+                    file=sys.stderr,
+                )
                 continue
 
             _, _, _, parent_idx = node
@@ -76,7 +94,16 @@ class Roof_features:
 
             # Only handles polygons with a nesting of two levels for now => no multipolygons.
             if len(ancestors) > 1:
-                print("Warning: polygon ring nesting level too deep, skipping", file=sys.stderr)
+                self.simplified_invalid.append(
+                    {
+                        "tile": f"{tile.z}/{tile.x}/{tile.y}",
+                        "reason": "polygon ring nesting level too deep",
+                    }
+                )
+                print(
+                    "Warning: polygon ring nesting level too deep, {tile.z}/{tile.x}/{tile.y}, skipping",
+                    file=sys.stderr,
+                )
                 continue
 
             # A single mapping: i => {i} implies single free-standing polygon, no inner rings.
@@ -103,11 +130,16 @@ class Roof_features:
                 self.features.append(geojson.Feature(geometry=geometry))
             else:
                 # Track which tile had invalid geometry
-                self.invalid_geometries.append({
-                    'tile': f"{tile.z}/{tile.x}/{tile.y}",
-                    'reason': 'extracted feature is not valid'
-                })
-                print(f"Warning: extracted feature is not valid in tile {tile.z}/{tile.x}/{tile.y}, skipping", file=sys.stderr)
+                self.invalid_geometries.append(
+                    {
+                        "tile": f"{tile.z}/{tile.x}/{tile.y}",
+                        "reason": "extracted feature is not valid",
+                    }
+                )
+                print(
+                    f"Warning: extracted feature is not valid in tile {tile.z}/{tile.x}/{tile.y}, skipping",
+                    file=sys.stderr,
+                )
 
     def save(self, out):
         collection = geojson.FeatureCollection(self.features)
@@ -119,12 +151,12 @@ class Roof_features:
         collection = geojson.FeatureCollection(self.features)
 
         return collection
-    
+
     def get_invalid_tiles_summary(self):
         """Return summary of problematic tiles"""
         return {
-            'total_invalid': len(self.invalid_geometries),
-            'total_simplified_invalid': len(self.simplified_invalid),
-            'invalid_tiles': self.invalid_geometries,
-            'simplified_invalid_tiles': self.simplified_invalid
+            "total_invalid": len(self.invalid_geometries),
+            "total_simplified_invalid": len(self.simplified_invalid),
+            "invalid_tiles": self.invalid_geometries,
+            "simplified_invalid_tiles": self.simplified_invalid,
         }
