@@ -114,9 +114,9 @@ The structure of the `results` folder is as follows:
  ┃--- ┗ 📂Cityname2  
  ┣ 📂04Results  
  ┃- ┗ 📊Cityname1_Green.geojson  
- ┃- ┗ 📊Cityname1_Solar.geojson
-┃- ┗ 📊Cityname1_Solar_buildings.xlsx
-┃- ┗ 📊Cityname2_Green.geojson  
+ ┃- ┗ 📊Cityname1_Solar.geojson  
+ ┃- ┗ 📊Cityname1_Solar_buildings.xlsx  
+ ┃- ┗ 📊Cityname2_Green.geojson  
  ┃- ┗ 📊Cityname2_Solar.geojson  
  ┃- ┗ 📊Cityname2_Solar_buildings.xlsx
 
