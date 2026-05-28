@@ -4,6 +4,7 @@ import collections
 import geojson
 
 import shapely.geometry
+import shapely.validation
 
 from src.features.core import (
     denoise,
@@ -129,15 +130,15 @@ class Roof_features:
             if shape.is_valid:
                 self.features.append(geojson.Feature(geometry=geometry))
             else:
-                # Track which tile had invalid geometry
+                reason = shapely.validation.explain_validity(shape)
                 self.invalid_geometries.append(
                     {
                         "tile": f"{tile.z}/{tile.x}/{tile.y}",
-                        "reason": "extracted feature is not valid",
+                        "reason": reason,
                     }
                 )
                 print(
-                    f"Warning: extracted feature is not valid in tile {tile.z}/{tile.x}/{tile.y}, skipping",
+                    f"Warning: invalid geometry in tile {tile.z}/{tile.x}/{tile.y}: {reason}, skipping",
                     file=sys.stderr,
                 )
 
