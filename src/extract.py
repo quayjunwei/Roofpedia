@@ -293,6 +293,8 @@ def intersection_solar(city_name, mask_dir):
 
         print(f"\nProcessing {len(all_invalid_tiles)} invalid tiles...")
 
+        city_sindex = city.sindex
+
         for invalid_tile_info in all_invalid_tiles:
             tile_path = invalid_tile_info["tile"]
             reason = invalid_tile_info["reason"]
@@ -305,7 +307,10 @@ def intersection_solar(city_name, mask_dir):
                 bounds = mercantile.bounds(tile)
                 tile_bbox = box(bounds.west, bounds.south, bounds.east, bounds.north)
 
-                for idx, building in city.iterrows():
+                candidate_idxs = list(city_sindex.intersection(tile_bbox.bounds))
+                candidates = city.iloc[candidate_idxs]
+
+                for idx, building in candidates.iterrows():
                     if building.geometry.intersects(tile_bbox):
                         intersection_geom = building.geometry.intersection(tile_bbox)
                         overlap_pct = (
